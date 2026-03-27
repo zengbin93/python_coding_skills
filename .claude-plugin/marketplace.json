@@ -1,0 +1,26 @@
+{
+  "name": "python-coding-skills",
+  "owner": {
+    "name": "zengbin93",
+    "email": ""
+  },
+  "metadata": {
+    "description": "用中文编写的高质量 Python skill 仓库，指导大模型生成高质量代码",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "python-skills",
+      "description": "Python 编程最佳实践、代码质量、测试规范、代码简化和代码审查技能集合",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/python-best-practices",
+        "./skills/python-code-quality",
+        "./skills/python-code-review",
+        "./skills/python-pytest",
+        "./skills/python-simplifier"
+      ]
+    }
+  ]
+}
