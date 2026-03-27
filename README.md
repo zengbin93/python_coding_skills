@@ -10,6 +10,7 @@ Python 编程相关的 skill 仓库，旨在指导大模型生成高质量的 Py
 | [python-pytest](.github/skills/python-pytest/SKILL.md) | 使用 pytest 编写高质量单元测试的通用规范 |
 | [python-simplifier](.github/skills/python-simplifier/SKILL.md) | Python 代码重构简化指南，提高可读性、消除冗余 |
 | [python-best-practices](.github/skills/python-best-practices/SKILL.md) | Python 编程最佳实践，指导编写高性能、高可读性代码 |
+| [python-code-review](.github/skills/python-code-review/SKILL.md) | Python 代码审查规范，评估代码是否符合本仓库制定的质量标准 |
 
 ## 使用方式
 

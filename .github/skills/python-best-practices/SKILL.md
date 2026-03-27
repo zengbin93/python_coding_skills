@@ -7,6 +7,90 @@ description: >
 
 # Python 编程最佳实践
 
+## 类型注解
+
+- **始终**为函数参数和返回值添加类型注解
+- 使用 `Type | None` 替代 `Optional[Type]`（Python 3.10+）
+- 在文件顶部添加 `from __future__ import annotations`，启用延迟类型求值
+- TypeVar 命名以 `T` 为后缀：`ChatResponseT = TypeVar("ChatResponseT", bound=ChatResponse)`
+- 只读输入参数使用 `Mapping` 而非 `MutableMapping`
+- 对于内部调用的方法，优先使用 `# type: ignore[具体规则]` 而非多余的类型转换或 `isinstance` 检查；注释需同时兼顾 mypy 和 pyright，避免遗漏其他错误
+
+```python
+from __future__ import annotations
+from collections.abc import Mapping
+from typing import TypeVar
+
+ResponseT = TypeVar("ResponseT", bound=BaseResponse)
+
+# ✅ 正确
+def process(data: list[str], limit: int | None = None) -> dict[str, int]:
+    ...
+
+# ❌ 错误
+from typing import List, Optional, Dict
+def process(data: List[str], limit: Optional[int] = None) -> Dict[str, int]:
+    ...
+```
+
+---
+
+## 函数参数
+
+- 位置参数：最多 3 个完全必须的参数
+- 可选参数放在 `*` 之后（强制关键字参数）
+- 提供基于字符串的重载，避免调用方引入额外的 import
+
+```python
+from typing import Literal
+
+def create_agent(
+    name: str,
+    tool_mode: Literal["auto", "required", "none"] | ChatToolMode,
+) -> Agent:
+    if isinstance(tool_mode, str):
+        tool_mode = ChatToolMode(tool_mode)
+    ...
+```
+
+- 避免遮蔽内置名称（用 `next_item` 替代 `next`，用 `type_` 替代 `type`）
+- 除非需要子类扩展，否则避免使用 `**kwargs`；优先使用具名参数
+
+---
+
+## 文档字符串
+
+对所有公开 API 使用 Google 风格 docstring：
+
+```python
+def calculate_discount(price: float, rate: float) -> float:
+    """计算折扣后的价格。
+
+    Args:
+        price: 原始价格，必须为正数。
+        rate: 折扣率，范围 0.0 到 1.0。
+
+    Returns:
+        折扣后的价格。
+
+    Raises:
+        ValueError: 当 rate 不在 [0, 1] 范围内时抛出。
+
+    Examples:
+        >>> calculate_discount(100.0, 0.2)
+        80.0
+    """
+    if not 0.0 <= rate <= 1.0:
+        raise ValueError(f"折扣率必须在 0 到 1 之间，当前值: {rate}")
+    return price * (1 - rate)
+```
+
+- 始终为自定义异常添加说明
+- 有关键字参数时显式使用 `Keyword Args:` 块
+- 标准 Python 异常仅在触发条件不显而易见时才需文档说明
+
+---
+
 ## 数据结构选择
 
 ### 选择正确的容器类型
