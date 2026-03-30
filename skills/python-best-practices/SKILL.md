@@ -119,11 +119,12 @@ queue.appendleft("first")
 first = queue.popleft()
 ```
 
-### 使用 dataclass 和 namedtuple
+### 使用 dataclass、namedtuple 和 pydantic
 
 ```python
 from dataclasses import dataclass, field
 from typing import NamedTuple
+from pydantic import BaseModel, Field
 
 # ✅ 不可变数据用 NamedTuple
 class Coordinate(NamedTuple):
@@ -142,7 +143,19 @@ class Config:
 class CacheKey:
     user_id: int
     resource: str
+
+# ✅ 边界数据、配置加载、接口入参校验优先使用 Pydantic
+class UserProfile(BaseModel):
+    user_id: int
+    name: str = Field(min_length=1)
+    email: str
+    tags: list[str] = Field(default_factory=list)
 ```
+
+- `dataclass` 适合内部领域对象和轻量数据载体
+- `NamedTuple` 适合不可变、偏位置语义的小型结构
+- `pydantic` 适合系统边界的数据建模：配置解析、API 请求/响应、消息载荷校验与序列化
+- 需要运行时校验、默认值规范化、字段约束、JSON Schema/OpenAPI 生成时，优先使用 `pydantic`
 
 ---
 
@@ -206,7 +219,7 @@ output = ", ".join(parts)
 ### 选择正确的并发模型
 
 ```python
-# I/O 密集型任务 → asyncio 或 ThreadPoolExecutor
+# I/O 密集型网络任务 → asyncio
 import asyncio
 import httpx
 
@@ -216,18 +229,28 @@ async def fetch_all(urls: list[str]) -> list[dict]:
         responses = await asyncio.gather(*tasks)
         return [r.json() for r in responses]
 
-# CPU 密集型任务 → ProcessPoolExecutor
-from concurrent.futures import ProcessPoolExecutor
+# 多线程、多进程任务统一使用 joblib
+from joblib import Parallel, delayed
 
 def process_data(chunk: list) -> list:
     return [expensive_computation(item) for item in chunk]
 
-def parallel_process(data: list, workers: int = 4) -> list:
-    chunks = [data[i::workers] for i in range(workers)]
-    with ProcessPoolExecutor(max_workers=workers) as executor:
-        results = executor.map(process_data, chunks)
-    return [item for chunk in results for item in chunk]
+def parallel_process(data: list, workers: int = 4) -> list[int]:
+    return Parallel(n_jobs=workers, prefer="processes")(
+        delayed(expensive_computation)(item) for item in data
+    )
+
+def parallel_fetch(paths: list[str], workers: int = 8) -> list[str]:
+    return Parallel(n_jobs=workers, prefer="threads")(
+        delayed(read_text)(path) for path in paths
+    )
 ```
+
+- 协程并发和线程/进程并发分开看：异步 I/O 用 `asyncio`，多线程/多进程统一用 `joblib`
+- `joblib.Parallel(..., prefer="threads")` 适合 I/O 密集型阻塞任务
+- `joblib.Parallel(..., prefer="processes")` 适合 CPU 密集型任务
+- 默认优先 `loky` 进程后端，避免直接散落 `ThreadPoolExecutor` / `ProcessPoolExecutor` 的实现细节
+- 需要共享大数组或缓存中间结果时，优先利用 `joblib` 的内存映射和持久化能力
 
 ### 异步最佳实践
 

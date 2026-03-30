@@ -9,7 +9,7 @@ description: >
 
 ## 工具配置
 
-本项目使用以下工具保障代码质量：
+推荐使用以下工具保障 Python 代码质量：
 
 - **ruff** — 代码格式化 + lint 检查（替代 black、isort、flake8）
 - **basedpyright** — 严格的静态类型检查（替代 mypy）
@@ -24,7 +24,7 @@ ruff format .
 ruff check . --fix
 
 # 仅检查不修复
-ruff check .
+ruff check . --no-fix
 
 # 类型检查
 basedpyright
@@ -33,7 +33,7 @@ basedpyright
 basedpyright src/module.py
 ```
 
-## ruff 配置（pyproject.toml）
+## 推荐 ruff 配置示例（pyproject.toml）
 
 ```toml
 [tool.ruff]
@@ -66,17 +66,16 @@ quote-style = "double"
 indent-style = "space"
 ```
 
-## basedpyright 配置（pyproject.toml）
+## 推荐 basedpyright 配置示例（pyproject.toml）
 
 ```toml
 [tool.basedpyright]
 pythonVersion = "3.10"
-typeCheckingMode = "standard"
+typeCheckingMode = "strict"
 reportMissingImports = true
 reportMissingTypeStubs = false
 
-# 严格模式（推荐用于新项目）
-# typeCheckingMode = "strict"
+# 存量项目可先从 standard 迁移，再逐步提升到 strict
 ```
 
 ## 代码风格规范
@@ -134,7 +133,10 @@ from mypackage.utils import helper
 
 ### 文档字符串
 
-使用 Google 风格的 docstring：
+公开 API 推荐使用 Google 风格的 docstring：
+
+- 公开模块、公开类、公开函数应编写 docstring
+- 模块内部的短小私有函数，如行为足够直观，可不强制编写
 
 ```python
 def calculate_discount(price: float, rate: float) -> float:
@@ -192,13 +194,13 @@ except:
 
 ## CI 集成
 
-在 GitHub Actions 中集成质量检查：
+推荐在 GitHub Actions 中集成质量检查：
 
 ```yaml
 - name: Lint and Format Check
   run: |
     ruff format --check .
-    ruff check .
+    ruff check . --no-fix
 
 - name: Type Check
   run: basedpyright
