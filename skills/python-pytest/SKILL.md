@@ -14,6 +14,18 @@ description: >
 - 测试名称应清晰表达被测行为和预期结果
 - 目标测试覆盖率：**核心逻辑 ≥ 80%**
 
+## 测试类型决策树
+
+| 要测试什么 | 推荐方式 |
+|-----------|---------|
+| 函数/方法的返回值 | 基本单元测试，AAA 模式 |
+| 函数的行为（调用、副作用） | Mock 验证函数调用和参数 |
+| 数据库/API 等外部依赖 | Fixtures + Mock 外部服务 |
+| 异步代码 | `pytest-asyncio`，配置 `asyncio_mode = "auto"` |
+| 多种输入组合 | `@pytest.mark.parametrize` 参数化测试 |
+| 异常情况 | `pytest.raises` |
+| 共享测试数据或资源 | Fixtures（按作用域选择） |
+
 ## 目录结构
 
 ```
@@ -152,6 +164,38 @@ def test_custom_exception_has_correct_code():
 
 ## Mock 和 Patch
 
+### monkeypatch vs pytest-mock
+
+**monkeypatch** — 简单替换，适合修改环境变量、配置等：
+```python
+def test_with_monkeypatch(monkeypatch):
+    monkeypatch.setenv("API_KEY", "test_key")
+    monkeypatch.setattr("module.function", mock_function)
+```
+
+**pytest-mock (mocker)** — 强大的 mock 功能，适合验证调用：
+```python
+def test_with_mocker(mocker):
+    mock_func = mocker.patch("module.function")
+    mock_func.return_value = "result"
+    mock_func.assert_called_with("args")
+```
+
+### Patch 策略
+
+✅ **正确**：在使用的地方 patch（patch 被测试代码所引用的路径）
+```python
+mocker.patch("myapp.utils.helper.function")  # myapp 使用 function
+```
+
+❌ **错误**：在定义的地方 patch
+```python
+from myapp.utils import helper
+mocker.patch("helper.function")  # 不会生效
+```
+
+### 常见 Mock 场景
+
 ```python
 from unittest.mock import MagicMock, patch
 
@@ -269,6 +313,44 @@ pytest -x
 # 并行执行（需安装 pytest-xdist）
 pytest -n auto
 ```
+
+## 工作流程
+
+### 编写新测试的步骤
+
+1. **确定测试类型** — 参考上方决策树，选择单元测试、集成测试或异步测试
+2. **创建测试文件** — `test_<module>.py`
+3. **编写测试函数** — 遵循 AAA 模式
+4. **添加必要的 fixtures** — 复用测试数据和资源
+5. **Mock 外部依赖** — 保持测试隔离和快速
+6. **验证覆盖率** — `pytest --cov`
+7. **运行测试** — `pytest -v`
+
+### 诊断测试失败
+
+1. **查看详细输出** — `pytest -v` 或 `pytest -vv`
+2. **打印调试信息** — 在测试中使用 `print()`（提交前删除）
+3. **运行单个测试** — `pytest tests/test_file.py::test_function`
+4. **查看完整错误栈** — `pytest --tb=long`
+
+## 详细参考文档
+
+本 skill 包含以下详细参考文档（位于 `references/` 目录）：
+
+### [fixtures.md](references/fixtures.md)
+Fixtures 完全指南：基础 fixtures、作用域、参数化、依赖关系、conftest.py、内置 fixtures（tmp_path、capsys、caplog、monkeypatch）、Async fixtures
+
+### [mocking.md](references/mocking.md)
+Mocking 和 Patching 完全指南：monkeypatch 用法、pytest-mock 使用、Mock 对象配置和验证、常见 mock 模式（API、数据库、文件系统）、Patch 策略、常见陷阱
+
+### [async-testing.md](references/async-testing.md)
+异步测试完全指南：pytest-asyncio 配置（auto/strict 模式）、基本异步测试、异步 fixtures、Loop scope 控制、Mock 异步操作
+
+### [patterns.md](references/patterns.md)
+常用测试模式和示例：测试组织、参数化测试、异常测试、标记和跳过、测试配置、数据驱动测试、集成测试模式、边界条件测试
+
+### [best-practices.md](references/best-practices.md)
+测试最佳实践和规范：FIRST 原则、AAA/Given-When-Then 模式、覆盖率配置、Fixture/Mock/断言最佳实践、性能考虑、CI/CD 集成
 
 ## 最佳实践
 
