@@ -54,17 +54,22 @@ lark-cli task +get-my-tasks
 ### 2.1 添加评论
 
 ```bash
-lark-cli task +comment --task-id "<task_id>" --content "<评论内容>" --as bot
+# 推荐：user 身份（权限更可靠）
+lark-cli task +comment --task-id "<guid>" --content "<评论内容>" --as user
+
+# 备选：bot 身份（需要 task:task:write 权限且被任务授权）
+lark-cli task +comment --task-id "<guid>" --content "<评论内容>" --as bot
 ```
 
 | 参数 | 说明 |
 |------|------|
-| `--task-id` | **任务 ID**（如 `t101043`），**不是 GUID** |
+| `--task-id` | **任务 GUID**（如 `9902c0c8-0722-41d2-9d80-f93011fd464a`），从 `task tasks get` 返回的 `task.guid` 字段获取 |
 | `--content` | 评论内容（纯文本，不支持 Markdown） |
-| `--as` | 身份：`user`（默认）或 `bot` |
+| `--as` | 身份：`user`（推荐）或 `bot` |
 
-> **常见错误**：使用 `--task-guid` 会报错 `unknown flag: --task-guid`。正确参数是 `--task-id`。
-> **权限要求**：bot 身份添加评论需要应用具有 `task:task:write` 权限且被任务创建者授权。若权限不足，改用 `--as user`。
+> **重要**：`--task-id` 参数应传入 GUID 而非短 ID（如 `t101046`）。短 ID 会导致 `Resource not found` 错误。
+>
+> **权限说明**：bot 身份通常缺少评论权限（`Permission denied`），建议优先使用 `--as user`。若 user 身份也不可用，发送橙色阻塞卡片通知任务负责人。
 
 ### 2.2 标记任务完成
 
@@ -206,7 +211,8 @@ lark-cli im +messages-send \
 | 错误现象 | 原因 | 解决方案 |
 |---------|------|---------|
 | `unknown flag: --task-guid` | `+comment` / `+complete` 等命令不支持 `--task-guid` | 使用 `--task-id`（任务 ID，如 `t101043`）；读取任务详情用 `tasks get --params` |
-| `Permission denied (code: 1470403)` | 当前身份无权限操作该任务 | 见下方权限处理指引 |
+| `Resource not found (code: 1470404)` | `+comment` 传入短 ID（如 `t101046`）而非 GUID | 改用完整 GUID：`--task-id "9902c0c8-..."` |
+| `Permission denied (code: 1470403)` | 当前身份无权限操作该任务 | 改用 `--as user`；见下方权限处理指引 |
 | `unknown flag: --content-file` | 不支持文件参数 | 直接使用 `--content` 传入字符串 |
 | bot 发消息失败 | bot 与用户无单聊 | 用户需先向 bot 发送过任意消息建立会话 |
 
@@ -220,7 +226,7 @@ lark-cli im +messages-send \
 |------|---------|------|
 | `task tasks get` | `--params '{"task_guid":"<guid>"}'` | 读取类命令用 `--params` 传 GUID |
 | `task subtasks list` | `--params '{"task_guid":"<guid>"}'` | 同上 |
-| `task +comment` | `--task-id "<task_id>"` | 操作类命令用 `--task-id` |
+| `task +comment` | `--task-id "<guid>"` | 操作类命令，传 GUID（非短 ID） |
 | `task +complete` | `--task-id "<task_id>"` | 同上 |
 | `task +reopen` | `--task-id "<task_id>"` | 同上 |
 | `task +update` | `--task-id "<task_id>"` | 同上 |
