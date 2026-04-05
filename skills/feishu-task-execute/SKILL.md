@@ -94,27 +94,168 @@ https?://[a-zA-Z0-9-]+\.feishu\.cn/(docx|wiki|sheets|doc)/[a-zA-Z0-9]+
 
 ### Step 5: 发送进度消息
 
-向任务负责人发送飞书消息。使用 `--user-id` 直接发送私聊消息：
+向任务负责人发送飞书**消息卡片**，提供更清晰直观的进度展示。
+
+#### 5.1 发送方式
+
+使用 `--msg-type interactive --content` 发送卡片消息：
 
 ```bash
-# 发送进度消息给任务负责人
-lark-cli im +messages-send --user-id "<assignee_open_id>" --text $'<进度消息内容>'
-```
-
-**消息格式**（纯文本，飞书评论不支持 Markdown）：
-
-```
-【飞书任务进度通知】
-
-任务：{summary}
-链接：{url}
-
-当前状态：{状态描述}
-进度说明：{已完成的进展}
-后续待执行：{接下来的计划}
+# 发送卡片消息给任务负责人
+lark-cli im +messages-send \
+  --user-id "<assignee_open_id>" \
+  --msg-type interactive \
+  --content '<卡片JSON字符串>'
 ```
 
 > 注意：lark-cli im +messages-send 仅支持 bot 身份。需确保 bot 与目标用户已有单聊关系。
+
+#### 5.2 标准进度卡片模板
+
+**通用进度通知**（蓝色主题）：
+
+```json
+{
+  "config": { "wide_screen_mode": true },
+  "header": {
+    "title": { "tag": "plain_text", "content": "📋 任务进度通知" },
+    "template": "blue"
+  },
+  "elements": [
+    {
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "**任务：** {summary}\n**链接：** [{url}]({url})"
+      }
+    },
+    { "tag": "hr" },
+    {
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "**当前状态：** {status}\n**进度说明：** {progress}\n**后续计划：** {next_plan}"
+      }
+    },
+    {
+      "tag": "action",
+      "actions": [
+        {
+          "tag": "button",
+          "text": { "tag": "plain_text", "content": "查看任务" },
+          "type": "primary",
+          "url": "{task_url}"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**任务完成通知**（绿色主题）：
+
+```json
+{
+  "config": { "wide_screen_mode": true },
+  "header": {
+    "title": { "tag": "plain_text", "content": "✅ 任务已完成" },
+    "template": "green"
+  },
+  "elements": [
+    {
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "**任务：** {summary}\n**链接：** [{url}]({url})"
+      }
+    },
+    { "tag": "hr" },
+    {
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "**完成说明：** {completion_summary}\n**变更文件：** {changed_files}"
+      }
+    },
+    {
+      "tag": "action",
+      "actions": [
+        {
+          "tag": "button",
+          "text": { "tag": "plain_text", "content": "查看任务" },
+          "type": "primary",
+          "url": "{task_url}"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**需要确认/阻塞通知**（橙色主题，详见 Step 5.4）。
+
+#### 5.3 卡片主题色对照
+
+| 场景 | header.template | header.title |
+|------|----------------|--------------|
+| 通用进度 | `blue` | `📋 任务进度通知` |
+| 开始执行 | `turquoise` | `🚀 开始执行任务` |
+| 任务完成 | `green` | `✅ 任务已完成` |
+| 需要确认/阻塞 | `orange` | `⚠️ 任务执行需要确认` |
+| 执行出错 | `red` | `❌ 任务执行异常` |
+
+#### 5.4 遇到需要用户审核/回答时的处理
+
+当执行过程中遇到需要用户确认、审核或回答的问题时（如方案选择、需求不明确、技术方案需决策等），**必须立即发送飞书卡片消息通知任务负责人**，避免任务因等待回复而卡住。
+
+**阻塞确认卡片模板**（橙色主题）：
+
+```json
+{
+  "config": { "wide_screen_mode": true },
+  "header": {
+    "title": { "tag": "plain_text", "content": "⚠️ 任务执行需要确认" },
+    "template": "orange"
+  },
+  "elements": [
+    {
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "**任务：** {summary}\n**链接：** [{url}]({url})"
+      }
+    },
+    { "tag": "hr" },
+    {
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "**阻塞原因：** {reason}\n\n**需要确认的问题：**\n{questions}\n\n请在 Claude Code 终端中回复，或通过飞书任务评论补充说明。"
+      }
+    },
+    {
+      "tag": "action",
+      "actions": [
+        {
+          "tag": "button",
+          "text": { "tag": "plain_text", "content": "查看任务" },
+          "type": "primary",
+          "url": "{task_url}"
+        }
+      ]
+    }
+  ]
+}
+```
+
+触发条件包括但不限于：
+- 任务描述不够清晰，需要补充需求细节
+- 存在多个技术方案，需要负责人选择
+- 发现潜在风险或依赖问题，需要确认处理方式
+- 代码变更范围超出预期，需要确认是否继续
+- 需要访问特定资源（服务器、数据库等）但缺少授权信息
+
+> 发送阻塞卡片后，在 Claude Code 终端中也会同时等待用户回复。两种渠道的回复均可推动任务继续。
 
 ### Step 6: 添加任务评论
 
@@ -133,17 +274,19 @@ lark-cli task +comment --task-id "<task_id>" --content "<纯文本评论内容>"
 
 ## 进度同步时机
 
-| 时机 | 操作 | 内容 |
-|------|------|------|
-| 开始执行 | 发送 IM 消息 | 确认收到任务，说明执行计划 |
-| 重要阶段完成 | 发送 IM + 添加评论 | 进展摘要，重要细节 |
-| 遇到阻塞 | 发送 IM 消息 | 问题描述，需要用户决策 |
-| 任务完成 | 发送 IM + 添加评论 | 最终成果，完成的变更列表 |
+| 时机 | 操作 | 卡片主题 | 内容 |
+|------|------|---------|------|
+| 开始执行 | 发送卡片消息 | 🚞 蓝色 | 确认收到任务，说明执行计划 |
+| 重要阶段完成 | 发送卡片 + 添加评论 | 📋 蓝色 | 进展摘要，重要细节 |
+| 遇到阻塞/需要确认 | 发送卡片消息 | ⚠️ 橙色 | 问题描述，需要用户决策（**必须立即发送，避免任务卡住**） |
+| 执行出错 | 发送卡片消息 | ❌ 红色 | 错误详情，影响范围 |
+| 任务完成 | 发送卡片 + 添加评论 | ✅ 绿色 | 最终成果，完成的变更列表 |
 
 ## 注意事项
 
-- 飞书评论**不支持 Markdown**，使用纯文本格式
-- IM 消息使用 `--text` 发送纯文本，避免格式丢失
+- 进度消息使用**飞书卡片**（`--msg-type interactive`），视觉效果更好，支持 Markdown 富文本和交互按钮
+- 飞书任务评论**不支持 Markdown 和卡片**，使用纯文本格式
+- 遇到需要用户确认/审核的问题时，**必须立即发送橙色阻塞卡片**通知负责人，不能仅依赖终端等待
 - 向用户确认后再发送消息和评论，避免意外打扰
-- 如果任务描述不清晰，先通过 IM 向负责人确认需求
+- 如果任务描述不清晰，先发送阻塞卡片并通过 IM 向负责人确认需求
 - 任务完成后可考虑使用 `lark-cli task +complete --task-id "<task_id>"` 标记完成（需用户确认）
