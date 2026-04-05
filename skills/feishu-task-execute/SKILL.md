@@ -9,6 +9,8 @@ description: "通过飞书任务驱动开发工作流。读取飞书任务（URL
 
 **前置依赖**: 必须先读取 [`../lark-shared/SKILL.md`](../lark-shared/SKILL.md) 了解认证和权限规则。
 
+**命令参考**: 所有命令的完整签名、参数说明和正确用法见 [`reference/lark-cli-commands.md`](reference/lark-cli-commands.md)。执行命令前务必查阅，避免参数错误。
+
 ## 工作流程
 
 ### Step 1: 解析任务标识
@@ -96,12 +98,20 @@ https?://[a-zA-Z0-9-]+\.feishu\.cn/(docx|wiki|sheets|doc)/[a-zA-Z0-9]+
 
 向任务负责人发送飞书**消息卡片**，提供更清晰直观的进度展示。
 
-#### 5.1 发送方式
+> **核心原则：必须积极主动推送进度，不能等用户来问。** 每次推送都要附带最近执行的摘要，让负责人无需查看终端就能了解任务动态。
+
+#### 5.1 主动推送规则
+
+- **不要等用户催**：在任务执行的关键节点主动发送进度卡片
+- **每次推送必须包含执行摘要**：说明最近做了什么、当前进展、下一步计划
+- **推送频率**：至少每完成一个重要步骤推送一次，不要积累太多才推送
+- **遇到问题立即推送**：不确认、报错、权限不足等，第一时间通知负责人
+
+#### 5.2 发送方式
 
 使用 `--msg-type interactive --content` 发送卡片消息：
 
 ```bash
-# 发送卡片消息给任务负责人
 lark-cli im +messages-send \
   --user-id "<assignee_open_id>" \
   --msg-type interactive \
@@ -110,143 +120,23 @@ lark-cli im +messages-send \
 
 > 注意：lark-cli im +messages-send 仅支持 bot 身份。需确保 bot 与目标用户已有单聊关系。
 
-#### 5.2 标准进度卡片模板
+#### 5.3 卡片模板
 
-**通用进度通知**（蓝色主题）：
+所有卡片模板、主题色和组件说明详见 [`reference/card-templates.md`](reference/card-templates.md)，包含 5 种标准模板：
 
-```json
-{
-  "config": { "wide_screen_mode": true },
-  "header": {
-    "title": { "tag": "plain_text", "content": "📋 任务进度通知" },
-    "template": "blue"
-  },
-  "elements": [
-    {
-      "tag": "div",
-      "text": {
-        "tag": "lark_md",
-        "content": "**任务：** {summary}\n**链接：** [{url}]({url})"
-      }
-    },
-    { "tag": "hr" },
-    {
-      "tag": "div",
-      "text": {
-        "tag": "lark_md",
-        "content": "**当前状态：** {status}\n**进度说明：** {progress}\n**后续计划：** {next_plan}"
-      }
-    },
-    {
-      "tag": "action",
-      "actions": [
-        {
-          "tag": "button",
-          "text": { "tag": "plain_text", "content": "查看任务" },
-          "type": "primary",
-          "url": "{task_url}"
-        }
-      ]
-    }
-  ]
-}
-```
+| 模板 | 主题色 | 场景 |
+|------|-------|------|
+| 通用进度通知 | 🔵 blue | 常规进度同步 |
+| 开始执行通知 | 🚀 turquoise | 确认收到任务，说明计划 |
+| 任务完成通知 | ✅ green | 执行完毕 |
+| 阻塞确认通知 | ⚠️ orange | 需要用户确认/回答 |
+| 执行出错通知 | ❌ red | 遇到无法继续的错误 |
 
-**任务完成通知**（绿色主题）：
-
-```json
-{
-  "config": { "wide_screen_mode": true },
-  "header": {
-    "title": { "tag": "plain_text", "content": "✅ 任务已完成" },
-    "template": "green"
-  },
-  "elements": [
-    {
-      "tag": "div",
-      "text": {
-        "tag": "lark_md",
-        "content": "**任务：** {summary}\n**链接：** [{url}]({url})"
-      }
-    },
-    { "tag": "hr" },
-    {
-      "tag": "div",
-      "text": {
-        "tag": "lark_md",
-        "content": "**完成说明：** {completion_summary}\n**变更文件：** {changed_files}"
-      }
-    },
-    {
-      "tag": "action",
-      "actions": [
-        {
-          "tag": "button",
-          "text": { "tag": "plain_text", "content": "查看任务" },
-          "type": "primary",
-          "url": "{task_url}"
-        }
-      ]
-    }
-  ]
-}
-```
-
-**需要确认/阻塞通知**（橙色主题，详见 Step 5.4）。
-
-#### 5.3 卡片主题色对照
-
-| 场景 | header.template | header.title |
-|------|----------------|--------------|
-| 通用进度 | `blue` | `📋 任务进度通知` |
-| 开始执行 | `turquoise` | `🚀 开始执行任务` |
-| 任务完成 | `green` | `✅ 任务已完成` |
-| 需要确认/阻塞 | `orange` | `⚠️ 任务执行需要确认` |
-| 执行出错 | `red` | `❌ 任务执行异常` |
+> 发送前先查阅卡片模板文件，根据当前场景选择对应模板，填充占位符后发送。
 
 #### 5.4 遇到需要用户审核/回答时的处理
 
-当执行过程中遇到需要用户确认、审核或回答的问题时（如方案选择、需求不明确、技术方案需决策等），**必须立即发送飞书卡片消息通知任务负责人**，避免任务因等待回复而卡住。
-
-**阻塞确认卡片模板**（橙色主题）：
-
-```json
-{
-  "config": { "wide_screen_mode": true },
-  "header": {
-    "title": { "tag": "plain_text", "content": "⚠️ 任务执行需要确认" },
-    "template": "orange"
-  },
-  "elements": [
-    {
-      "tag": "div",
-      "text": {
-        "tag": "lark_md",
-        "content": "**任务：** {summary}\n**链接：** [{url}]({url})"
-      }
-    },
-    { "tag": "hr" },
-    {
-      "tag": "div",
-      "text": {
-        "tag": "lark_md",
-        "content": "**阻塞原因：** {reason}\n\n**需要确认的问题：**\n{questions}\n\n请在 Claude Code 终端中回复，或通过飞书任务评论补充说明。"
-      }
-    },
-    {
-      "tag": "action",
-      "actions": [
-        {
-          "tag": "button",
-          "text": { "tag": "plain_text", "content": "查看任务" },
-          "type": "primary",
-          "url": "{task_url}"
-        }
-      ]
-    }
-  ]
-}
-```
+当执行过程中遇到需要用户确认、审核或回答的问题时，**必须立即发送橙色阻塞卡片通知任务负责人**，避免任务因等待回复而卡住。
 
 触发条件包括但不限于：
 - 任务描述不够清晰，需要补充需求细节
@@ -254,6 +144,7 @@ lark-cli im +messages-send \
 - 发现潜在风险或依赖问题，需要确认处理方式
 - 代码变更范围超出预期，需要确认是否继续
 - 需要访问特定资源（服务器、数据库等）但缺少授权信息
+- 权限不足，需要负责人协助申请权限或将 bot 加为任务成员
 
 > 发送阻塞卡片后，在 Claude Code 终端中也会同时等待用户回复。两种渠道的回复均可推动任务继续。
 
@@ -274,19 +165,78 @@ lark-cli task +comment --task-id "<task_id>" --content "<纯文本评论内容>"
 
 ## 进度同步时机
 
-| 时机 | 操作 | 卡片主题 | 内容 |
-|------|------|---------|------|
-| 开始执行 | 发送卡片消息 | 🚞 蓝色 | 确认收到任务，说明执行计划 |
-| 重要阶段完成 | 发送卡片 + 添加评论 | 📋 蓝色 | 进展摘要，重要细节 |
-| 遇到阻塞/需要确认 | 发送卡片消息 | ⚠️ 橙色 | 问题描述，需要用户决策（**必须立即发送，避免任务卡住**） |
-| 执行出错 | 发送卡片消息 | ❌ 红色 | 错误详情，影响范围 |
-| 任务完成 | 发送卡片 + 添加评论 | ✅ 绿色 | 最终成果，完成的变更列表 |
+| 时机 | 操作 | 卡片模板 | 必须包含的内容 |
+|------|------|---------|--------------|
+| 开始执行 | 发送卡片消息 | 🚀 turquoise | 执行计划、预计时间 |
+| 重要阶段完成 | 发送卡片 + 添加评论 | 📋 blue | 已完成的进展摘要、下一步计划 |
+| 遇到阻塞/需要确认 | **立即**发送卡片消息 | ⚠️ orange | 当前进度、阻塞原因、具体问题 |
+| 执行出错 | **立即**发送卡片消息 | ❌ red | 出错前进度、错误详情、影响范围 |
+| 任务完成 | 发送卡片 + 添加评论 | ✅ green | 完成说明、变更文件、执行摘要 |
+
+> **记住**：推送进度不是可选操作，是必须操作。负责人不应该需要主动来问"做到哪了"。
 
 ## 注意事项
 
-- 进度消息使用**飞书卡片**（`--msg-type interactive`），视觉效果更好，支持 Markdown 富文本和交互按钮
+- **必须积极主动推送进度**，每次推送附带最近执行摘要，让负责人无需查看终端即可了解任务动态
+- 进度消息使用**飞书卡片**（`--msg-type interactive`），卡片模板详见 [`reference/card-templates.md`](reference/card-templates.md)
 - 飞书任务评论**不支持 Markdown 和卡片**，使用纯文本格式
 - 遇到需要用户确认/审核的问题时，**必须立即发送橙色阻塞卡片**通知负责人，不能仅依赖终端等待
 - 向用户确认后再发送消息和评论，避免意外打扰
 - 如果任务描述不清晰，先发送阻塞卡片并通过 IM 向负责人确认需求
 - 任务完成后可考虑使用 `lark-cli task +complete --task-id "<task_id>"` 标记完成（需用户确认）
+
+## 常见错误与权限处理
+
+### 命令参数错误
+
+**错误示例**：`unknown flag: --task-guid`
+
+`+comment`、`+complete`、`+reopen`、`+update`、`+assign` 等操作命令只接受 `--task-id`（任务 ID，如 `t101043`），不支持 `--task-guid`。
+
+- 需要用 GUID 查询任务 → 用 `task tasks get --params '{"task_guid":"<guid>"}'`，从返回结果中获取 `task_id`
+- 需要操作任务（评论、完成等）→ 用 `--task-id "<task_id>"`
+
+详细对照见 [`reference/lark-cli-commands.md`](reference/lark-cli-commands.md) 第 5 节。
+
+### 权限不足（Permission denied）
+
+**典型错误**：
+
+```json
+{
+  "error": {
+    "type": "permission_error",
+    "code": 1470403,
+    "message": "Permission denied (Details: Invoker is unauthorized to create a comment for the task with guid '...'.)"
+  }
+}
+```
+
+**排查步骤**：
+
+1. **尝试切换身份**：bot 权限不足时，改用 `--as user`（需要用户已通过 `lark-cli auth login` 登录）
+   ```bash
+   # 用 user 身份替代 bot
+   lark-cli task +comment --task-id "<task_id>" --content "评论" --as user
+   ```
+
+2. **检查应用权限**：在[飞书开放平台后台](https://open.feishu.cn/app) → 应用 → 权限管理，确认已开通：
+   - `task:task:read` — 读取任务
+   - `task:task:write` — 编辑任务（含评论、完成）
+   - `im:message:send` — 发送消息
+
+3. **申请权限**：如果权限未开通：
+   - 在应用后台「权限管理」中搜索并申请对应权限
+   - 需要管理员审批通过后才生效
+   - 若无管理员权限，将所需权限列表发送给任务负责人协助申请
+
+4. **检查任务可见性**：bot 应用需要是任务的成员（创建者、负责人或关注者）才能操作
+
+**遇到权限错误时的标准处理流程**：
+
+1. 先尝试 `--as user` 切换身份重试
+2. 如果仍失败，发送橙色阻塞卡片通知任务负责人，说明：
+   - 缺少的具体权限名称和 code
+   - 申请权限的操作步骤
+   - 或请负责人将 bot 应用添加为任务关注者
+3. 在终端中同时等待用户指示，提供备选方案（如手动在飞书中操作）
