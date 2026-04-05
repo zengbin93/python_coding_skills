@@ -19,7 +19,8 @@
         "./skills/python-code-quality",
         "./skills/python-code-review",
         "./skills/python-pytest",
-        "./skills/python-simplifier"
+        "./skills/python-simplifier",
+        "./skills/feishu-task-execute"
       ]
     }
   ]
