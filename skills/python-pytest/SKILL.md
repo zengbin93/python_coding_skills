@@ -1,8 +1,9 @@
 ---
 name: python-pytest
 description: >
-  使用 pytest 编写高质量单元测试的通用规范。涵盖测试结构、fixture 使用、断言风格、
-  参数化测试、异步测试和覆盖率目标。在创建或修改测试文件时使用此 skill。
+  使用 pytest 编写高质量测试的通用规范。涵盖单元测试、集成测试（内部流程）、生产环境冒烟测试、
+  测试目录三层分离、fixture 使用、Mock 策略、参数化测试、异步测试和覆盖率目标。
+  在创建或修改测试文件时使用此 skill。
 ---
 
 # Python pytest 测试规范
@@ -37,11 +38,21 @@ project/
 │       └── user_service.py
 └── tests/
     ├── conftest.py          # 共享 fixture
-    ├── test_calculator.py
-    └── test_user_service.py
+    ├── unit/                # 单元测试（快，无外部依赖）
+    ├── integration/         # 集成测试（测试环境，连真实依赖）
+    └── production/          # 生产冒烟（只读、健康检查）
 ```
 
 **注意**：`tests/` 目录不需要 `__init__.py` 文件。
+
+按层执行：
+
+```bash
+pytest tests/unit/                    # 快速验证，CI 必跑
+pytest tests/integration/             # 连真实依赖，较慢
+pytest tests/production/ -v           # 发布后冒烟
+pytest -m "not production"            # 排除生产测试
+```
 
 ## 测试文件命名
 
@@ -216,6 +227,103 @@ def test_get_user_calls_api_with_correct_id():
     mock_client.get.assert_called_once_with("/users/1")
     assert user["name"] == "李四"
 ```
+
+## 集成测试（内部流程）
+
+集成测试验证多模块串联的完整业务流程，与单元测试的核心区别在于 **Mock 范围**：
+
+| | 单元测试 | 集成测试 |
+|---|---|---|
+| Mock 范围 | Mock 一切外部依赖 | 只 Mock 真正的外部边界（DB、HTTP、文件） |
+| 测试粒度 | 单个函数/方法 | 完整业务流程 |
+| 速度 | 极快 | 较慢，可接受 |
+
+### 只 Mock 外部边界，内部逻辑走真实代码
+
+```python
+# ✅ 内部流程全部走真实代码，只隔离外部 I/O
+def test_factor_compute_pipeline(mocker, sample_data):
+    mocker.patch("myapp.data.get_klines", return_value=sample_data)  # 只 Mock 外部边界
+
+    engine = TimeSeriesEngine(data=sample_data, factor=factor)
+    result = engine.results
+
+    assert not result.empty
+    assert "F#SMA60#DEFAULT" in result.columns
+```
+
+### 按流程阶段组织，而非按模块
+
+```python
+# tests/integration/test_factor_pipeline.py
+
+def test_factor_compute_returns_valid_output(sample_data):
+    """阶段1：因子计算"""
+    engine = TimeSeriesEngine(data=sample_data, factor=factor)
+    assert not engine.results.empty
+
+def test_factor_eval_ic_is_reasonable(factor_results):
+    """阶段2：因子评估"""
+    ic = calc_ic(factor_results)
+    assert abs(ic) > 0.01
+
+def test_model_weights_sum_to_one(factor_results):
+    """阶段3：策略建模"""
+    model = CSSorting(factor_results, factor="F#SMA60#DEFAULT", top_pct=0.2)
+    weights = model.run()
+    assert abs(weights["weight"].sum()) <= 1.0
+```
+
+### fixture scope 选择
+
+| 场景 | 推荐 scope |
+|------|-----------|
+| 生成测试数据（无状态） | `module` 或 `session` |
+| 有状态的对象（如引擎实例） | `function` |
+| 数据库连接 | `session` |
+
+### 常见坑
+
+- **Mock 太多 → 等于没测**：如果内部多个模块都被 Mock，流程没有真正串联
+- **测试间隐式依赖**：测试 B 不能依赖测试 A 的副作用，每个用例应能独立运行
+
+## 生产环境测试原则
+
+pytest 可以做生产环境验证，但必须严格区分场景。
+
+### 可以做的（安全场景）
+
+| 场景 | 说明 |
+|------|------|
+| 冒烟测试 | 发布后验证服务启动、关键接口可用 |
+| 健康检查 | 验证环境变量、证书、依赖服务连通性 |
+| 流量回放 | 复制生产流量对比新旧版本，不影响用户 |
+| 性能基准 | 验证新版本不比旧版慢、无内存泄漏 |
+
+### 绝对禁止
+
+- 带写操作的用例（建数据、删数据、改状态）→ 污染生产库
+- 高并发测试 → 打垮生产服务
+- 普通单元测试直接在生产跑（很多单测会清表、Mock 外部依赖）
+
+### 生产冒烟示例
+
+```python
+@pytest.mark.production
+def test_api_health(client):
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"
+
+@pytest.mark.production
+def test_api_response_time(client):
+    import time
+    start = time.time()
+    client.get("/api/user/info")
+    assert time.time() - start < 0.3  # 响应时间断言
+```
+
+生产测试强制规则：只读不写、禁止造脏数据、单线程串行、禁止 `truncate`/`drop`。
 
 ## 异步测试
 

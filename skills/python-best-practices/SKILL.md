@@ -480,3 +480,7 @@ def _internal_helper() -> None:
     """内部实现，不对外暴露。"""
     ...
 ```
+
+### 公共 API 内部调用流程图
+
+当公共 API 入口函数内部涉及多个私有辅助函数、嵌套循环或多阶段流水线时，**必须**在模块顶部 docstring 中绘制 ASCII 调用流程图，并用 `# ═══ §N ═══` 分节注释呼应流程图。详见 [reference/public-api-flow-diagram.md](reference/public-api-flow-diagram.md)。

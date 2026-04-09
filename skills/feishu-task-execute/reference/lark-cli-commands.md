@@ -234,3 +234,60 @@ lark-cli im +messages-send \
 | `task +create` | 无需标识 | 创建新任务 |
 | `im +messages-send` | `--user-id "<open_id>"` | 按人发送 |
 | `im +messages-send` | `--chat-id "<chat_id>"` | 按群发送 |
+
+---
+
+## 6. 文档（docs）命令速查
+
+> 优先用 `lark-doc` skill；以下是 fallback 命令签名。
+
+### 读取 / 搜索 / 创建
+
+```bash
+# 读取（返回 Markdown）
+lark-cli docs +fetch --doc "<url|token>" --format pretty --as user
+
+# 全局搜索（云空间 + 知识库）
+lark-cli docs +search --query "关键词" --as user
+
+# 从 Markdown 创建
+lark-cli docs +create --title "标题" --markdown "$(cat report.md)" --as user
+```
+
+### 更新（mode 速查）
+
+```bash
+lark-cli docs +update --doc "<url|token>" --mode <mode> [--markdown "..."] --as user
+```
+
+| mode | 用途 | 配套参数 |
+|------|------|---------|
+| `append` | 追加到文末（写进度首选） | `--markdown` |
+| `overwrite` / `replace_all` | 全文覆盖 | `--markdown` |
+| `replace_range` | 范围替换 | `--selection-with-ellipsis "起始...结尾"` |
+| `insert_before` / `insert_after` | 按标题插入 | `--selection-by-title "## 标题"` |
+| `delete_range` | 范围删除 | `--selection-with-ellipsis` |
+
+可选 `--new-title "新标题"` 同步改标题；`--dry-run` 预演不执行。
+
+### 媒体与白板
+
+```bash
+# 插入本地图片/文件到文末
+lark-cli docs +media-insert --doc "<url|token>" --file "./chart.png" --as user
+
+# 下载文档中的图片或白板缩略图
+lark-cli docs +media-download --doc "<url|token>" --out-dir ./assets --as user
+
+# 更新已有白板（DSL 走 stdin，配合 lark-whiteboard skill）
+echo '<dsl>' | lark-cli docs +whiteboard-update --doc "<url|token>" --as user
+```
+
+### docs 最佳实践
+
+- **身份默认 user**：docs 系列绝大多数操作 bot 无权，遇到权限错误首选 `--as user`
+- **追加优于覆盖**：写进度/结果用 `--mode append`，避免误删
+- **定位用标题**：`insert_*` 优先 `--selection-by-title`，比 ellipsis 稳
+- **长内容走文件**：`--markdown` 超几百字时用 `$(cat file.md)` 避免 shell 转义
+- **wiki 链接**：`feishu.cn/wiki/<page_id>` 需先用 `lark-wiki` skill 解析 obj_token 再操作
+- **绘图统一走 `lark-whiteboard` skill**：先用 `docs +update --markdown '<whiteboard type="blank"></whiteboard>'` 占位，再 `+whiteboard-update` 注入 DSL；不要在 Markdown 里写 mermaid 或 ASCII 图
